@@ -18,6 +18,9 @@ int botaoONOFF = 2;
 int lastAumenta = HIGH;
 int lastDiminui = HIGH;
 int lastONOFF = HIGH;
+bool teto = false; // 0 EMBAIXO 1 EM CIMA
+bool chao = false;
+float histerese = 0.25;
 bool ONOFF = false;
 int ktcSO = 8; //PINO DIGITAL (SO)
 int ktcCS = 9; //PINO DIGITAL (CS)
@@ -50,6 +53,10 @@ void setDisplay() {
   lcd.print("MV: ");
   lcd.setCursor(3, 1);
   lcd.print(ktc.readCelsius());
+  lcd.setCursor(9, 1);
+  lcd.print("H: ");
+  lcd.setCursor(11,1);
+  lcd.print(histerese); 
   lcd.setCursor(13, 0);
 
   if (ONOFF) {
@@ -112,17 +119,20 @@ void loop() {
 
   setDisplay();
   ONOFF = tab_reg[2];
+  histerese = (float) (tab_reg[7] / 100.0);
   readBotaoAumenta();
   readBotaoDiminui();
   readBotaoONOFF();
   if (ONOFF) {
-    if (ktc.readCelsius() >= set_point) {
+    if (ktc.readCelsius() >= (set_point + histerese)) {
       digitalWrite(fan, HIGH);
       digitalWrite(resistor, LOW);
     }
-    else {
-      digitalWrite(fan, LOW);
+    else if (ktc.readCelsius() <= (set_point - histerese)) {
       digitalWrite(resistor, HIGH);
+    }
+    if (ktc.readCelsius() < (set_point + histerese)) {
+      digitalWrite(fan, LOW);
     }
   } else {
     digitalWrite(fan, LOW);
@@ -134,6 +144,7 @@ void loop() {
   tab_reg[2] = ONOFF;
   tab_reg[5] = digitalRead(resistor);
   tab_reg[6] = digitalRead(fan);
+  tab_reg[7] = (int16_t) (histerese * 100);
 
   modbusino_slave.loop(tab_reg, 10); //Atualizando o Modbus
   delay(200); //INTERVALO DE 200 MILISSEGUNDOS
